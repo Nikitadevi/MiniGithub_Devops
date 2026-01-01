@@ -1,54 +1,66 @@
 from flask import Flask, render_template, request
+import requests
 import subprocess
 
 app = Flask(__name__)
 
-# Home Page
+# ------------------- HOME PAGE -------------------
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-# ------------------- SHOW COMMITS AS TABLE ---------------------
+# ------------------- FULL COMMIT HISTORY FROM GITHUB API -------------------
 @app.route("/commits")
 def show_commits():
-    logs = subprocess.getoutput("git log --pretty=format:'%h - %s - %an - %ad' --date=short")
-    logs_list = logs.split("\n")
+    repo_owner = "Nikitadevi"   # your GitHub username
+    repo_name = "MiniGithub_DevopsProject"  # your GitHub repo name
 
-    html = "<h2 style='font-family:Arial;'>Commit History</h2>"
-    html += "<table border='1' cellpadding='8' style='border-collapse:collapse;font-family:Arial;'>"
-    html += "<tr><th>Hash</th><th>Message</th><th>Author</th><th>Date</th></tr>"
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits"
+    response = requests.get(url)
+    data = response.json()
 
-    for log in logs_list:
-        parts = log.split(" - ")
-        if len(parts) == 4:
-            html += f"<tr><td>{parts[0]}</td><td>{parts[1]}</td><td>{parts[2]}</td><td>{parts[3]}</td></tr>"
+    html = """
+    <h1 style='font-family:Arial;'>Commit History</h1>
+    <table border='1' cellpadding='8' style='border-collapse:collapse;font-family:Arial;width:90%;'>
+    <tr><th>Hash</th><th>Message</th><th>Author</th><th>Date</th></tr>
+    """
+
+    for commit in data:
+        sha = commit['sha'][:7]
+        message = commit['commit']['message']
+        author = commit['commit']['author']['name']
+        date = commit['commit']['author']['date'][:10]
+
+        html += f"<tr><td>{sha}</td><td>{message}</td><td>{author}</td><td>{date}</td></tr>"
 
     html += "</table>"
     return html
 
 
-# ------------------- SHOW BRANCHES LIST ---------------------
+# ------------------- BRANCH LIST -------------------
 @app.route("/branches")
 def show_branches():
-    branches = subprocess.getoutput("git branch")
+    branches = subprocess.getoutput("git branch -a")
     branches_list = branches.split("\n")
 
-    html = "<h2 style='font-family:Arial;'>Available Branches</h2><ul style='font-size:20px;'>"
+    html = "<h1 style='font-family:Arial;'>Available Branches</h1>"
+    html += "<ul style='font-size:20px;font-family:Arial;'>"
+
     for b in branches_list:
         html += f"<li>{b}</li>"
     html += "</ul>"
-
     return html
 
-# ------------------- SHOW GIT STATUS ---------------------
+
+# ------------------- GIT STATUS -------------------
 @app.route("/status")
 def git_status():
     status = subprocess.getoutput("git status")
-    return f"<h2 style='font-family:Arial;'>Git Status</h2><pre>{status}</pre>"
+    return f"<h1 style='font-family:Arial;'>Git Status</h1><pre>{status}</pre>"
 
 
-# Run Git Command through UI
+# ------------------- RUN GIT COMMANDS THROUGH UI -------------------
 @app.route("/run", methods=["GET", "POST"])
 def run_git_command():
     output = ""
@@ -57,14 +69,15 @@ def run_git_command():
         output = subprocess.getoutput(cmd)
 
     return f"""
-    <h2>Run Git Command</h2>
+    <h2 style='font-family:Arial;'>Run Git Command</h2>
     <form method='POST'>
-        <input name='gitcmd' placeholder='Enter git command' style='width:300px;padding:8px;'/>
+        <input name='gitcmd' placeholder='Enter git command' style='width:300px;padding:8px;'>
         <button type='submit' style='padding:8px 16px;'>Run</button>
     </form>
     <pre>{output}</pre>
     """
 
 
+# ------------------- RUN FLASK -------------------
 if __name__ == "__main__":
     app.run(debug=True)
